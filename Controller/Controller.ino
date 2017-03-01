@@ -93,9 +93,6 @@ void setup()
 
 void loop()
 {
-
-
-
 	int throttle;
 	int joystickX_RawValue = analogRead(joystick_X_Pin);
 	int joystickY_RawValue = analogRead(joystick_Y_Pin);
