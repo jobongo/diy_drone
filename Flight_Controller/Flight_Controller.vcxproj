@@ -11,9 +11,9 @@
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
-    <ProjectGuid>{C5F80730-F44F-4478-BDAE-6634EFC2CA88}</ProjectGuid>
-    <RootNamespace>Controller</RootNamespace>
-    <ProjectName>Controller</ProjectName>
+    <ProjectGuid>{C2C5B28C-0F13-45A3-8AB4-C95277E9FE1F}</ProjectGuid>
+    <RootNamespace>Flight_Controller</RootNamespace>
+    <ProjectName>Flight_Controller</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -47,8 +47,8 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>$(ProjectDir)..\..\..\..\..\..\Program Files (x86)\Arduino\hardware\teensy\avr\libraries\SPI;$(ProjectDir)..\..\..\Arduino\libraries\RF24-master;$(ProjectDir)..\..\..\Arduino\libraries\RF24-master\utility;$(ProjectDir)..\..\..\..\..\..\Program Files (x86)\Arduino\libraries;$(ProjectDir)..\..\..\..\..\..\Program Files (x86)\Arduino\hardware\teensy\avr\libraries;$(ProjectDir)..\..\..\Arduino\libraries;$(ProjectDir)..\..\..\..\..\..\Program Files (x86)\Arduino\hardware\teensy\avr\cores\teensy3;$(ProjectDir)..\..\..\..\..\..\Program Files (x86)\Arduino\hardware\teensy\avr\cores\teensy3\avr;$(ProjectDir)..\..\..\..\..\..\Program Files (x86)\Arduino\hardware\teensy\avr\cores\teensy3\util;$(ProjectDir)..\..\..\..\..\..\Program Files (x86)\Arduino\hardware\teensy\avr\cores\teensy3\utils;$(ProjectDir)..\..\..\..\..\..\Program Files (x86)\Arduino\hardware\teensy\avr\cores\teensy3\avr;$(ProjectDir)..\..\..\..\..\..\Program Files (x86)\Arduino\hardware\tools\arm\arm-none-eabi\include;$(ProjectDir)..\Controller;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <ForcedIncludeFiles>$(ProjectDir)__vm\.Controller.vsarduino.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\..\..\..\..\..\Program Files (x86)\Arduino\hardware\teensy\avr\libraries\SPI;$(ProjectDir)..\..\..\Arduino\libraries\RF24-master;$(ProjectDir)..\..\..\..\..\..\Program Files (x86)\Arduino\hardware\teensy\avr\libraries\Servo;$(ProjectDir)..\..\..\Arduino\libraries\I2Cdev;$(ProjectDir)..\..\..\..\..\..\Program Files (x86)\Arduino\hardware\teensy\avr\libraries\Wire;$(ProjectDir)..\..\..\Arduino\libraries\MPU6050;$(ProjectDir)..\..\..\Arduino\libraries\RF24-master\utility;$(ProjectDir)..\..\..\..\..\..\Program Files (x86)\Arduino\hardware\teensy\avr\libraries\Wire\utility;$(ProjectDir)..\..\..\..\..\..\Program Files (x86)\Arduino\libraries;$(ProjectDir)..\..\..\..\..\..\Program Files (x86)\Arduino\hardware\teensy\avr\libraries;$(ProjectDir)..\..\..\Arduino\libraries;$(ProjectDir)..\..\..\..\..\..\Program Files (x86)\Arduino\hardware\teensy\avr\cores\teensy3;$(ProjectDir)..\..\..\..\..\..\Program Files (x86)\Arduino\hardware\teensy\avr\cores\teensy3\avr;$(ProjectDir)..\..\..\..\..\..\Program Files (x86)\Arduino\hardware\teensy\avr\cores\teensy3\util;$(ProjectDir)..\..\..\..\..\..\Program Files (x86)\Arduino\hardware\teensy\avr\cores\teensy3\utils;$(ProjectDir)..\..\..\..\..\..\Program Files (x86)\Arduino\hardware\teensy\avr\cores\teensy3\avr;$(ProjectDir)..\..\..\..\..\..\Program Files (x86)\Arduino\hardware\tools\arm\arm-none-eabi\include;$(ProjectDir)..\Flight_Controller;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <ForcedIncludeFiles>$(ProjectDir)__vm\.Flight_Controller.vsarduino.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
       <IgnoreStandardIncludePath>false</IgnoreStandardIncludePath>
       <PreprocessorDefinitions>__HARDWARE_MK20dx256__;__HARDWARE_MK20DX256__;__MK20DX256__;TEENSYDUINO=134;ARDUINO=10801;F_CPU=96000000;USB_SERIAL;LAYOUT_US_ENGLISH;__cplusplus=201103L;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
@@ -77,12 +77,12 @@
     <DebuggerFlavor>VisualMicroDebugger</DebuggerFlavor>
   </PropertyGroup>
   <ItemGroup>
-    <None Include="Controller.ino">
+    <None Include="Flight_Controller.ino">
       <FileType>CppCode</FileType>
     </None>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="__vm\.Controller.vsarduino.h" />
+    <ClInclude Include="__vm\.Flight_Controller.vsarduino.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
