@@ -81,8 +81,18 @@ IRQ	-> Not Used
 #define CE_PIN 9
 #define CSN_PIN 10
 RF24 radio(CE_PIN, CSN_PIN); // Create Radio
-Servo FL_MOTOR, FR_MOTOR, RL_MOTOR, RR_MOTOR; //Separate instance for each of the ESC's
-const uint64_t pipe = 0xFFFFLL; // Declare the transmit pipe
+
+/*
+******************************************************************************************
+Make sure that in the servo library in servo.h that the defualt time is set to 0 microseconds
+(If this is not done, the esc's will not calibrate correctly) To get better response from the 
+ESCs, set the minimum refresh time is set to 2500(400hz). 
+******************************************************************************************
+*/
+Servo FL_MOTOR, FR_MOTOR, RL_MOTOR, RR_MOTOR; //Separate instances for each of the ESC's
+
+const uint64_t pipe = 0xFFFFLL; // The radio transmit pipe. This can be whatever value but 
+								// must be the same on the controller and the drone.
 
 /* 
 Parts of MPU Code taken from
@@ -164,7 +174,7 @@ unsigned long oldTime1;
 				serial output of various parameters.
 */
 
-bool serialDebug = true;
+bool serialDebug = false;
 unsigned long debugTime;
 unsigned long oldTime2;
 unsigned long debugPollTime = 500; //Time in milliseconds to output to serial.
@@ -197,10 +207,10 @@ void setup() {
 	radio.openReadingPipe(1, pipe);
 	radio.startListening();
 
-	FL_MOTOR.attach(3); // Assigns each ESC to pins 3-6 respectively. 
-	FR_MOTOR.attach(4);
-	RL_MOTOR.attach(5);
-	RR_MOTOR.attach(6);
+	FL_MOTOR.attach(3, 600, 2000); // Assigns each ESC to pins 3-6 respectively. 
+	FR_MOTOR.attach(4, 600, 2000);
+	RL_MOTOR.attach(5, 600, 2000);
+	RR_MOTOR.attach(6, 600, 2000);
 
 	// join I2C bus (I2Cdev library doesn't do this automatically)
 #if I2CDEV_IMPLEMENTATION == I2CDEV_ARDUINO_WIRE

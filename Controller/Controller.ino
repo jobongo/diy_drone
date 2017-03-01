@@ -40,7 +40,7 @@ MOSI-> Pin 11
 MISO-> Pin 12
 IRG	-> Not Used
 */
-const uint64_t pipe = 0xE8E8F0F0E1LL; // Define the transmit pipe
+const uint64_t pipe = 0xFFFFLL; // Define the transmit pipe
 
 
 
