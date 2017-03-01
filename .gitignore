@@ -12,6 +12,7 @@
 *.sln
 *.vcxproj
 *.filters
+
 # Build results
 [Dd]ebug/
 [Dd]ebugPublic/
