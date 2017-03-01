@@ -14,19 +14,19 @@
 // Updates should (hopefully) always be available at https://github.com/jrowberg/i2cdevlib
 //
 // Changelog:
-//      2013-05-08 - added seamless Fastwire support
-//                 - added note about gyro calibration
-//      2012-06-21 - added note about Arduino 1.0.1 + Leonardo compatibility error
-//      2012-06-20 - improved FIFO overflow handling and simplified read process
-//      2012-06-19 - completely rearranged DMP initialization code and simplification
-//      2012-06-13 - pull gyro and accel data from FIFO packet instead of reading directly
-//      2012-06-09 - fix broken FIFO read sequence and change interrupt detection to RISING
-//      2012-06-05 - add gravity-compensated initial reference frame acceleration output
-//                 - add 3D math helper file to DMP6 example sketch
-//                 - add Euler output and Yaw/Pitch/Roll output formats
-//      2012-06-04 - remove accel offset clearing for better results (thanks Sungon Lee)
-//      2012-06-01 - fixed gyro sensitivity to be 2000 deg/sec instead of 250
-//      2012-05-30 - basic DMP initialization working
+// 2013-05-08 - added seamless Fastwire support
+//            - added note about gyro calibration
+// 2012-06-21 - added note about Arduino 1.0.1 + Leonardo compatibility error
+// 2012-06-20 - improved FIFO overflow handling and simplified read process
+// 2012-06-19 - completely rearranged DMP initialization code and simplification
+// 2012-06-13 - pull gyro and accel data from FIFO packet instead of reading directly
+// 2012-06-09 - fix broken FIFO read sequence and change interrupt detection to RISING
+// 2012-06-05 - add gravity-compensated initial reference frame acceleration output
+//            - add 3D math helper file to DMP6 example sketch
+//            - add Euler output and Yaw/Pitch/Roll output formats
+// 2012-06-04 - remove accel offset clearing for better results (thanks Sungon Lee)
+// 2012-06-01 - fixed gyro sensitivity to be 2000 deg/sec instead of 250
+// 2012-05-30 - basic DMP initialization working
 
 /* ============================================
 I2Cdev device library code is placed under the MIT license
@@ -63,38 +63,31 @@ THE SOFTWARE.
 
 MPU6050 mpu;
 
+/* =================== NRF24L01 SETUP ===============*/
 
-/* =====================================================
------( Declare Constants and Pin Numbers )-----
-
-NRF24L01 Setup
-
-GND	->
+/*
+GND	-> GND
 VCC	-> 3.3v Nrf24L01 is rated for up to 3.6v
 CSN	-> Pin 10
 CE	-> Pin 9
 SCK	-> Pin 13
 MOSI-> Pin 11
 MISO-> Pin 12
-IRG	-> Not Used
+IRQ	-> Not Used
 
+-----( Declare Constants, Pin Numbers, and setup radio )-----
 */
 
 #define CE_PIN 9
 #define CSN_PIN 10
-
 RF24 radio(CE_PIN, CSN_PIN); // Create Radio
 Servo FL_MOTOR, FR_MOTOR, RL_MOTOR, RR_MOTOR; //Separate instance for each of the ESC's
-
 const uint64_t pipe = 0xFFFFLL; // Declare the transmit pipe
 
-
-
-								/* Parts of MPU Code taken from
-
-								http://playground.arduino.cc/Main/I2cScanner
-
-								*/
+/* 
+Parts of MPU Code taken from
+http://playground.arduino.cc/Main/I2cScanner
+*/
 
 bool dmpReady = false;  // set true if DMP init was successful
 uint8_t mpuIntStatus;   // holds actual interrupt status byte from MPU
@@ -112,27 +105,24 @@ float ypr[3], yaw, pitch, roll;         // [yaw, pitch, roll] yaw/pitch/roll con
 int16_t gyro[3];			// [Gyro-X, Gyro-Y, Gyro-Z] Gyro measurements for rate of rotation
 uint8_t intPin = 2;
 
-int16_t controller[4]; // Array to hold variables sent from controller.
+/* ================= CONTROLLER VARIABLES ================== */
 
-					   // ===================================================== 
-					   // ===			Controller Variables	             ===
-					   // ===================================================== 
-int throttle;	//Throttle position from controller.
-int controllerRoll;	// Position of Joystick X Axis (ROLL).
-int controllerPitch;	// Position of Joystick Y (PITCH).
-float controllerYaw;		// Yaw position from controller. 
+int16_t controller[4]; // Array to hold data sent from controller.
+int throttle;			//Throttle position from controller.			<---- initialize variables here?
+int controllerRoll;		// Position of Joystick X Axis (ROLL).
+int controllerPitch;	// Position of Joystick Y (PITCH).            
+float controllerYaw;	// Yaw position from controller. 
 
-							// ===================================================== 
-							// ===			  DRONE VARIABLES  	                 ===
-							// ===================================================== 
+/* ====================== MPU 6050 ========================= */
+
 int flMotorSpeed; //Variable to hold front left ESC speed.
 int frMotorSpeed; //Variable to hold front right ESC speed.
 int rlMotorSpeed; //Variable to hold rear left ESC speed.
 int rrMotorSpeed; //Variable to hold rear left ESC speed
 
-				  // ==================================================== 
-				  // ===			Correction Variables       	        ===
-				  // ==================================================== 
+				  
+/* ================ CORRECTION VARIABLES =================== */
+
 float FL_Roll_Adj, FR_Roll_Adj, RL_Roll_Adj, RR_Roll_Adj;
 float FL_Pitch_Adj, FR_Pitch_Adj, RL_Pitch_Adj, RR_Pitch_Adj;
 float FL_Yaw_Adj, FR_Yaw_Adj, RL_Yaw_Adj, RR_Yaw_Adj;
@@ -142,16 +132,16 @@ float xGyroCorr, yGyroCorr, xAccelCorr, yAccelCorr, zAccelCorr;
 float yawAutoCorr = 2;
 float yawAdjust;
 
-// =====================================
-// ===			MISCELLANEOUS        ===
-// ===================================== 
+/* ===================== MISCELLANEOUS ===================== */
+
 bool rotorLowerCal = false;
 bool rotorUpperCal = false;
 bool rotorsCalibrated = false;
+bool unstableYaw = true;
+float heading;
 
-// ===================================== 
-// ===			MPU 6050             ===
-// ===================================== 
+/* ======================== MPU 6050 ======================= */
+
 float xaReal;
 float yaReal;
 float zaReal;
@@ -162,54 +152,45 @@ float aRes = 2.0 / 16384.0;
 float gRes = 250.0 / 16384.0;
 int16_t ax, ay, az, gx, gy, gz;
 
-// ===================================== 
-// ===		RADIO READ RATE          ===
-// ===================================== 
+/* ================== RADIO READ RATE ====================== */
+
 unsigned long currentTime;
 unsigned long radioTime;
 unsigned long oldTime1;
 
-// ===================================== 
-// ===		DEBUG OPTIONS	         ===
-// ===================================== 
-//----- Set the following to true to enable 
-//-------- serial output of various --------
-//-------------------------------- parameters. ------------------------------//
-//DroneDebug debug;
+/* ===================== DEBUG OPTIONS ===================== */
+/*
+				Set the following to true to enable 
+				serial output of various parameters.
+*/
 
 bool serialDebug = true;
 unsigned long debugTime;
 unsigned long oldTime2;
-unsigned long debugPollTime = 500;
+unsigned long debugPollTime = 500; //Time in milliseconds to output to serial.
 bool aDebug = false; // Output Accelerometer Values
 bool gDebug = false; // Ouput Gyroscope Values
 bool yprDebug = false; // Output Yaw, Pitch, Roll Values
-bool dmpDebug = false; // Output DMP6 Values
-bool controlDebug = false; //Output values received from joystick
+bool dmpDebug = false; // Output DMP Values Only
+bool controlDebug = false; //Output values received from controller
 bool finalThrottle = false;
 bool droneDebug = true;
 bool correctionFactors = false;
 
-// ===================================== 
-// ===     INTERRUPT DETECTION       ===
-// ===================================== 
+/* ================== INTERRUPT DETECTION  ================= */
+
 volatile bool mpuInterrupt = false; // indicates whether MPU interrupt pin has gone high
 
-bool unstableYaw = true;
-float heading;
+/* ======================= SETUP ============================ */
 
-// ===================================== 
-// ===		    	SETUP            ===
-// ===================================== 
 void setup() {
 	pinMode(0, INPUT);
-	//Serial.begin(115200);
+	//Serial.begin(115200); //Not needed if using Teensy 3.1/2
 	delay(500);
+	
 	Serial.println("Nrf24L01 Receiver Starting");
 	radio.begin();
-
 	radio.setDataRate(RF24_2MBPS);
-
 	radio.setPALevel(RF24_PA_LOW);
 	radio.setChannel(52);
 	radio.setRetries(15, 15);
@@ -224,26 +205,26 @@ void setup() {
 	// join I2C bus (I2Cdev library doesn't do this automatically)
 #if I2CDEV_IMPLEMENTATION == I2CDEV_ARDUINO_WIRE
 	Wire.begin();
-	//TWBR = 24; // 400kHz I2C clock (200kHz if CPU is 8MHz). Comment this line if having compilation difficulties with TWBR.
+	TWBR = 24; // 400kHz I2C clock (200kHz if CPU is 8MHz). Comment this line if having compilation difficulties with TWBR.
 	//#elif I2CDEV_IMPLEMENTATION == I2CDEV_BUILTIN_FASTWIRE
 	//Fastwire::setup(400, true);
 #endif
 
 	Serial.println(F("Initializing MPU..."));
 	mpu.initialize();
-	mpu.setSleepEnabled(false);
+	mpu.setSleepEnabled(false); //This is important to ensure that Sleep is disabled.
 
 	// verify connection
 	Serial.println(F("Testing Connection to MPU..."));
 	Serial.println(mpu.testConnection() ? F("MPU6050 connection successful") : F("MPU6050 connection failed"));
 	delay(2000);
-	SET_MPU_SCALE();
+	SET_MPU_SCALE(); //Changes the scale (resolution) of the MPU. Should not normally need to be changed. 
 
 	// load and configure the DMP
 	Serial.println(F("Initializing DMP..."));
 	devStatus = mpu.dmpInitialize();
 
-	SET_MPU_OFFSET(); //Set Gyro and Accel Offsets
+	SET_MPU_OFFSET(); //Set Gyro and Accel Offsets to calibrate the MPU.
 
 	if (devStatus == 0) { // make sure it worked (returns 0 if so)
 		Serial.println(F("Enabling DMP..."));
@@ -273,30 +254,24 @@ void setup() {
 								//This is written for SimonK firmwares with a pulsewidth range of ~600 - 2000
 	DETECT_STABLE_YAW();
 }
-// ====================================
-// ===			  MAIN              ===
-// ====================================
+
+/* ========================== MAIN ========================= */
+
 void loop() {
 	READ_MPU_DATA();
-
 	FLY();
-	//Serial.print("Heading is: ");
-	//Serial.println(heading);
 
 	currentTime = millis();
 	debugTime = currentTime - oldTime2;
 
 	if (serialDebug && debugTime > debugPollTime)
 	{
-		//debug.ypr(yaw, pitch, roll);
 		SERIAL_DEBUG();
 		oldTime2 = currentTime;
 	}
 }
 
-// =====================================
-// ===	        FUNCTIONS	         ===
-// =====================================
+/* ======================= FUNCTIONS ======================== */
 
 void FLY() {
 	currentTime = millis();
@@ -573,8 +548,6 @@ void DETECT_STABLE_YAW() {
 		}
 	}
 }
-
-
 void READ_MPU_DATA() {
 	// if programming failed, don't try to do anything
 	if (!dmpReady) return;
