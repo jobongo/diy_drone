@@ -8,15 +8,15 @@ This was a way to learn C++ and Autocad but also to get into circuit board desig
 I used the Teensy 3.2 Microcontroller for this build. 3.1 should be fine as well. The only difference is the current rating on the 3.3v output.
 
 <h4>Flight Controller</h4>
-The flight controller, at the moment, consists of the following:
-Teensy 3.2
-NRF24L01+ Radio (PA LNA Version)
-MPU6050 Motion Controller
+The flight controller, at the moment, consists of the following:<br>
+Teensy 3.2<br>
+NRF24L01+ Radio (PA LNA Version)<br>
+MPU6050 Motion Controller<br>
 <h4>Controller</h4>
-The controller at the moment consists of the following:
-Teensy 3.2
-2 PS2 Thumb Joysticks
-NRF24L01+ Radio (PA LNA Version)
+The controller at the moment consists of the following:<br>
+Teensy 3.2<br>
+2 PS2 Thumb Joysticks<br>
+NRF24L01+ Radio (PA LNA Version)<br>
 <h4>Microcontrollers</h4>
 It should be possible to use different microcontrollers at this stage. Even the libraries should be the same, only specifying the board when compiling. 
 <h2>The Software</h2>
