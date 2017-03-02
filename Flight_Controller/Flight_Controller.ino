@@ -53,11 +53,12 @@ THE SOFTWARE.
 */
 
 /******( Import needed libraries )******/
-#include <SPI.h>
-#include <nRF24L01.h>
+//#include <SPI.h> //<----Using RF24.h
+//#include <I2Cdev.h> //<----Using the Teensy Arduino Wire Implementation
+//#include <nRF24L01.h> // <----Another SPI implementation for the NRF24L01
+
 #include <RF24.h>
 #include <Servo.h>
-#include <I2Cdev.h>
 #include <MPU6050_6Axis_MotionApps20.h>
 #include <Wire.h>
 
@@ -67,7 +68,7 @@ MPU6050 mpu;
 
 /*
 GND	-> GND
-VCC	-> 3.3v Nrf24L01 is rated for up to 3.6v
+VCC	-> 3.3v Nrf24L01 is rated for up to 3.6v without a voltage regulator. 
 CSN	-> Pin 10
 CE	-> Pin 9
 SCK	-> Pin 13
@@ -80,13 +81,13 @@ IRQ	-> Not Used
 
 #define CE_PIN 9
 #define CSN_PIN 10
-RF24 radio(CE_PIN, CSN_PIN); // Create Radio
+RF24 radio(CE_PIN, CSN_PIN); // Create Radio Instance
 
 /*
 ******************************************************************************************
-Make sure that in the servo library in servo.h that the defualt time is set to 0 microseconds
-(If this is not done, the esc's will not calibrate correctly) To get better response from the 
-ESCs, set the minimum refresh time is set to 2500(400hz). 
+Make sure that in the servo library in servo header file that the default time is set to 0 microseconds
+(If this is not done, the esc's will not calibrate correctly). To get better response from the 
+ESCs, set the minimum refresh time is set to 2500(400hz) (default is 20000). 
 ******************************************************************************************
 */
 Servo FL_MOTOR, FR_MOTOR, RL_MOTOR, RR_MOTOR; //Separate instances for each of the ESC's
@@ -95,7 +96,7 @@ const uint64_t pipe = 0xFFFFLL; // The radio transmit pipe. This can be whatever
 								// must be the same on the controller and the drone.
 
 /* 
-Parts of MPU Code taken from
+Parts of the following MPU Code taken from
 http://playground.arduino.cc/Main/I2cScanner
 */
 
@@ -175,9 +176,6 @@ unsigned long oldTime1;
 */
 
 bool serialDebug = false;
-unsigned long debugTime;
-unsigned long oldTime2;
-unsigned long debugPollTime = 500; //Time in milliseconds to output to serial.
 bool aDebug = false; // Output Accelerometer Values
 bool gDebug = false; // Ouput Gyroscope Values
 bool yprDebug = false; // Output Yaw, Pitch, Roll Values
@@ -186,6 +184,10 @@ bool controlDebug = false; //Output values received from controller
 bool finalThrottle = false;
 bool droneDebug = true;
 bool correctionFactors = false;
+
+unsigned long debugTime;
+unsigned long oldTime2;
+unsigned long debugPollTime = 500; //Time in milliseconds to output to serial.
 
 /* ================== INTERRUPT DETECTION  ================= */
 
@@ -214,10 +216,9 @@ void setup() {
 
 	// join I2C bus (I2Cdev library doesn't do this automatically)
 #if I2CDEV_IMPLEMENTATION == I2CDEV_ARDUINO_WIRE
-	Wire.begin();
+	Wire.begin(); // Still testing the difference between Wire and Jeff Rowberg's Libraries.
 	TWBR = 24; // 400kHz I2C clock (200kHz if CPU is 8MHz). Comment this line if having compilation difficulties with TWBR.
 	//#elif I2CDEV_IMPLEMENTATION == I2CDEV_BUILTIN_FASTWIRE
-	//Fastwire::setup(400, true);
 #endif
 
 	Serial.println(F("Initializing MPU..."));
