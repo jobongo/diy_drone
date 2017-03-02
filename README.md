@@ -24,16 +24,16 @@ Some of the code is taken from  from from different sources. I used the I2C code
 Also, the code for extracting the MPU data was taken from
 <a href="https://github.com/jrowberg/i2cdevlib/tree/master/Arduino/MPU6050/examples/MPU6050_DMP6"> MPU 6050 DMP6</a> (Jeff Rowberg i2cdevlib Git Repo)
 <h4>Flight Controller</h4>
-The flight controller, at the moment, consists of the following:
-Teensy 3.2
-NRF24L01+ Radio (PA LNA Version)
-MPU6050 Motion Controller
+The flight controller, at the moment, consists of the following:<br>
+Teensy 3.2<br>
+NRF24L01+ Radio (PA LNA Version)<br>
+MPU6050 Motion Controller<br>
 
 <h4>Controller</h4>
-The controller at the moment consists of the following:
-Teensy 3.2
-2 PS2 Thumb Joysticks
-NRF24L01+ Radio (PA LNA Version)
+The controller at the moment consists of the following:<br>
+Teensy 3.2<br>
+2 PS2 Thumb Joysticks<br>
+NRF24L01+ Radio (PA LNA Version)<br>
 <h2>The Frame</h2>
 <h4>Design</h4>
 <h2>The Circuitry</h2>
