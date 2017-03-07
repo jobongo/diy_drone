@@ -99,8 +99,8 @@ void loop()
 	int joystickYaw_RawValue = analogRead(yawAdjust_Pin);
 	int yawValue = Define_Yaw_Adjust();
 
-	xInputValue = (Define_X_Value());
-	yInputValue = (Define_Y_Value());
+	xInputValue = Define_X_Value();
+	yInputValue = Define_Y_Value();
 	throttle = Define_Throttle();
 
 	Serial.print("X-Analog Reading: \t");
@@ -150,7 +150,7 @@ void loop()
 
 int Define_Throttle() {
 	int throttle = analogRead(throttle_Pin);
-	throttle = map(throttle, 0, 1023, 400, 2300);
+	throttle = map(throttle, 0, 1023, 420, 2250);
 	throttle = constrain(throttle, 650, 2000);
 
 	return throttle;
@@ -160,12 +160,12 @@ int Define_X_Value() {
 	int xInputValue = analogRead(joystick_X_Pin);
 	if (xInputValue <= xInputZero)
 	{
-		xInputValue = map(xInputValue, 0, xInputZero, -115, 0);
+		xInputValue = map(xInputValue, 0, xInputZero, -55, 0); // 55 to compensate for controller dead zone  of +-10 below
 	}
 	else if (xInputValue >= xInputZero) {
-		xInputValue = map(xInputValue, xInputZero, 1023, 0, 115);
+		xInputValue = map(xInputValue, xInputZero, 1023, 0, 55);
 	}
-	if ((xInputValue > -10) && (xInputValue < 10))
+	if ((xInputValue > -10) && (xInputValue < 10)) //controller deadzone becuase joystick doesn't always return to exactly 0
 	{
 		xInputValue = 0;
 	}
@@ -185,12 +185,12 @@ int Define_Y_Value() {
 
 
 	if (yInputValue <= yInputZero) {
-		yInputValue = map(yInputValue, 0, yInputZero, 115, 0);
+		yInputValue = map(yInputValue, 0, yInputZero, 55, 0); // 55 to compensate for controller dead zone  of +-10 below
 	}
 	else if (yInputValue >= yInputZero) {
-		yInputValue = map(yInputValue, yInputZero, 1023, 0, -115);
+		yInputValue = map(yInputValue, yInputZero, 1023, 0, -55); // 55 to compensate for controller dead zone  of +-10 below
 	}
-	if ((yInputValue > -10) && (yInputValue < 10))
+	if ((yInputValue > -10) && (yInputValue < 10)) //controller deadzone becuase joystick doesn't always return to 0
 	{
 		yInputValue = 0;
 	}

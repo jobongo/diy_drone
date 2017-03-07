@@ -85,9 +85,10 @@ RF24 radio(CE_PIN, CSN_PIN); // Create Radio Instance
 
 /*
 ******************************************************************************************
-Make sure that in the servo library in servo header file that the default time is set to 0 microseconds
-(If this is not done, the esc's will not calibrate correctly). To get better response from the 
-ESCs, set the minimum refresh time is set to 2500(400hz) (default is 20000). 
+Make sure that in the servo library in the servo header file that the default time is set
+to 0 microseconds (If this is not done, the esc's will not calibrate correctly). To get
+better response from the ESCs, set the minimum refresh time is set to 2500(400hz) (default
+is 20000).
 ******************************************************************************************
 */
 Servo FL_MOTOR, FR_MOTOR, RL_MOTOR, RR_MOTOR; //Separate instances for each of the ESC's
@@ -97,7 +98,7 @@ const uint64_t pipe = 0xFFFFLL; // The radio transmit pipe. This can be whatever
 
 /* 
 Parts of the following MPU Code taken from
-http://playground.arduino.cc/Main/I2cScanner
+https://github.com/jrowberg/i2cdevlib/tree/master/Arduino/MPU6050/examples/MPU6050_DMP6
 */
 
 bool dmpReady = false;  // set true if DMP init was successful
@@ -120,8 +121,8 @@ uint8_t intPin = 2;
 
 int16_t controller[4]; // Array to hold data sent from controller.
 int throttle;			//Throttle position from controller.			<---- initialize variables here?
-int controllerRoll;		// Position of Joystick X Axis (ROLL).
-int controllerPitch;	// Position of Joystick Y (PITCH).            
+int cRoll;		// Position of Joystick X Axis (ROLL).
+int cPitch;	// Position of Joystick Y (PITCH).            
 float controllerYaw;	// Yaw position from controller. 
 
 /* ====================== MPU 6050 ========================= */
@@ -134,11 +135,11 @@ int rrMotorSpeed; //Variable to hold rear left ESC speed
 				  
 /* ================ CORRECTION VARIABLES =================== */
 
-float FL_Roll_Adj, FR_Roll_Adj, RL_Roll_Adj, RR_Roll_Adj;
-float FL_Pitch_Adj, FR_Pitch_Adj, RL_Pitch_Adj, RR_Pitch_Adj;
-float FL_Yaw_Adj, FR_Yaw_Adj, RL_Yaw_Adj, RR_Yaw_Adj;
-float FL_Yaw_Corr, FR_Yaw_Corr, RL_Yaw_Corr, RR_Yaw_Corr;
-float FL_YPR_Corr, FR_YPR_Corr, RL_YPR_Corr, RR_YPR_Corr;
+float flRollAdj = 0, frRollAdj = 0, rlRollAdj = 0, rrRollAdj = 0;
+float flPitchAdj = 0, frPitchAdj = 0, rlPitchAdj = 0, rrPitchAdj = 0;
+float flYawAdj, frYawAdj, rlYawAdj, rrYawAdj;
+float flYawCorr, frYawCorr, rlYawCorr, rrYawCorr;
+float flYPRCorr, frYPRCorr, rlYPRCorr, rrYPRCorr;
 float xGyroCorr, yGyroCorr, xAccelCorr, yAccelCorr, zAccelCorr;
 float yawAutoCorr = 2;
 float yawAdjust;
@@ -175,7 +176,7 @@ unsigned long oldTime1;
 				serial output of various parameters.
 */
 
-bool serialDebug = false;
+bool serialDebugEn = true;
 bool aDebug = false; // Output Accelerometer Values
 bool gDebug = false; // Ouput Gyroscope Values
 bool yprDebug = false; // Output Yaw, Pitch, Roll Values
@@ -183,11 +184,11 @@ bool dmpDebug = false; // Output DMP Values Only
 bool controlDebug = false; //Output values received from controller
 bool finalThrottle = false;
 bool droneDebug = true;
-bool correctionFactors = false;
+bool correctionFactors = true;
 
 unsigned long debugTime;
 unsigned long oldTime2;
-unsigned long debugPollTime = 500; //Time in milliseconds to output to serial.
+unsigned long debugPollTime = 10; //Time in milliseconds to output to serial.
 
 /* ================== INTERRUPT DETECTION  ================= */
 
@@ -202,8 +203,8 @@ void setup() {
 	
 	Serial.println("Nrf24L01 Receiver Starting");
 	radio.begin();
-	radio.setDataRate(RF24_2MBPS);
-	radio.setPALevel(RF24_PA_LOW);
+	radio.setDataRate(RF24_2MBPS); //Specify transmission speed. Accepted values are RF24_2MBPS, RF24_1MBPS, and RF24_250KBPS
+	radio.setPALevel(RF24_PA_LOW); //Tranmit Power. Accepted values are RF24_PA_MIN, RF24_PA_LOW, RF24_PA_HIGH, RF24_PA_MAX, RF24_PA_ERROR
 	radio.setChannel(52);
 	radio.setRetries(15, 15);
 	radio.openReadingPipe(1, pipe);
@@ -229,20 +230,20 @@ void setup() {
 	Serial.println(F("Testing Connection to MPU..."));
 	Serial.println(mpu.testConnection() ? F("MPU6050 connection successful") : F("MPU6050 connection failed"));
 	delay(2000);
-	SET_MPU_SCALE(); //Changes the scale (resolution) of the MPU. Should not normally need to be changed. 
+	setMPUScale(); //Changes the scale (resolution) of the MPU. Should not normally need to be changed. 
 
 	// load and configure the DMP
 	Serial.println(F("Initializing DMP..."));
 	devStatus = mpu.dmpInitialize();
 
-	SET_MPU_OFFSET(); //Set Gyro and Accel Offsets to calibrate the MPU.
+	setMPUOffset(); //Set Gyro and Accel Offsets to calibrate the MPU.
 
 	if (devStatus == 0) { // make sure it worked (returns 0 if so)
 		Serial.println(F("Enabling DMP..."));
 		mpu.setDMPEnabled(true); // turn on the DMP, now that it's ready
 		Serial.println(F("Enabling interrupt detection (Arduino external interrupt 0)..."));// enable Arduino interrupt detection
 		pinMode(intPin, INPUT);
-		attachInterrupt(intPin, DMP_DATA_READY, RISING);
+		attachInterrupt(intPin, dmpDataReady, RISING);
 		mpuIntStatus = mpu.getIntStatus();
 		Serial.println(F("DMP ready! Waiting for first interrupt..."));
 		dmpReady = true; // set our DMP Ready flag so the main loop() function knows it's okay to use it
@@ -261,30 +262,30 @@ void setup() {
 	//Serial.print("Rate is ");
 	//Serial.println(rate);
 
-	CALIBRATE_ESC();			//Run ESC Calibration before flying. Checks minimum and maximum throttle positions. 
+	escCalibration();			//Run ESC Calibration before flying. Checks minimum and maximum throttle positions. 
 								//This is written for SimonK firmwares with a pulsewidth range of ~600 - 2000
-	DETECT_STABLE_YAW();
+	detectStableYaw();
 }
 
 /* ========================== MAIN ========================= */
 
 void loop() {
-	READ_MPU_DATA();
-	FLY();
+	readMPUData();
+	fly();
 
 	currentTime = millis();
 	debugTime = currentTime - oldTime2;
 
-	if (serialDebug && debugTime > debugPollTime)
+	if (serialDebugEn && debugTime > debugPollTime)
 	{
-		SERIAL_DEBUG();
+		serialDebug();
 		oldTime2 = currentTime;
 	}
 }
 
 /* ======================= FUNCTIONS ======================== */
 
-void FLY() {
+void fly() {
 	currentTime = millis();
 	radioTime = currentTime - oldTime1;
 	if (radioTime > 10)
@@ -299,17 +300,24 @@ void FLY() {
 
 	throttle = controller[0];
 	controllerYaw = controller[1];
-	controllerRoll = controller[2];
-	controllerPitch = controller[3];
+	cRoll = controller[2];
+	cPitch = controller[3];
 
-	CALC_ANG_CORR();
-	CALC_GYRO_CORR();
-	CALC_ACCEL_CORR();
+	autoLeveling();
+	calcGyroCorr();
+	calcAccelCorr();
 
-	flMotorSpeed = throttle + FL_YPR_Corr - xGyroCorr + yGyroCorr + xAccelCorr + yAccelCorr - zAccelCorr;
-	frMotorSpeed = throttle + FR_YPR_Corr + xGyroCorr + yGyroCorr + xAccelCorr - yAccelCorr - zAccelCorr;
-	rlMotorSpeed = throttle + RL_YPR_Corr - xGyroCorr - yGyroCorr - xAccelCorr + yAccelCorr - zAccelCorr;
-	rrMotorSpeed = throttle + RR_YPR_Corr + xGyroCorr - yGyroCorr - xAccelCorr - yAccelCorr - zAccelCorr;
+	/* Working Code. Code below is test. 
+	flMotorSpeed = throttle + flYPRCorr - xGyroCorr + yGyroCorr + xAccelCorr + yAccelCorr - zAccelCorr;
+	frMotorSpeed = throttle + frYPRCorr + xGyroCorr + yGyroCorr + xAccelCorr - yAccelCorr - zAccelCorr;
+	rlMotorSpeed = throttle + rlYPRCorr - xGyroCorr - yGyroCorr - xAccelCorr + yAccelCorr - zAccelCorr;
+	rrMotorSpeed = throttle + rrYPRCorr + xGyroCorr - yGyroCorr - xAccelCorr - yAccelCorr - zAccelCorr;
+	*/
+	/* Testing different solutions for autobalancing.*/
+	flMotorSpeed = throttle + flYPRCorr;// - xGyroCorr + yGyroCorr + xAccelCorr + yAccelCorr - zAccelCorr;
+	frMotorSpeed = throttle + frYPRCorr;// + xGyroCorr + yGyroCorr + xAccelCorr - yAccelCorr - zAccelCorr;
+	rlMotorSpeed = throttle + rlYPRCorr;// - xGyroCorr - yGyroCorr - xAccelCorr + yAccelCorr - zAccelCorr;
+	rrMotorSpeed = throttle + rrYPRCorr;// + xGyroCorr - yGyroCorr - xAccelCorr - yAccelCorr - zAccelCorr;
 
 	flMotorSpeed = constrain(flMotorSpeed, 650, 2000);
 	frMotorSpeed = constrain(frMotorSpeed, 650, 2000);
@@ -318,7 +326,7 @@ void FLY() {
 
 	if (throttle >700)
 	{
-		SET_MOTOR_SPEED(flMotorSpeed, frMotorSpeed, rlMotorSpeed, rrMotorSpeed);
+		setRotorSpeed(flMotorSpeed, frMotorSpeed, rlMotorSpeed, rrMotorSpeed);
 	}
 	else
 	{
@@ -326,18 +334,18 @@ void FLY() {
 		frMotorSpeed = throttle;
 		rlMotorSpeed = throttle;
 		rrMotorSpeed = throttle;
-		SET_MOTOR_SPEED(flMotorSpeed, frMotorSpeed, rlMotorSpeed, rrMotorSpeed);
+		setRotorSpeed(flMotorSpeed, frMotorSpeed, rlMotorSpeed, rrMotorSpeed);
 	}
 }
-void SET_MOTOR_SPEED(int flMotorSpeed, int frMotorSpeed, int rlMotorSpeed, int rrMotorSpeed) {
-	currentTime = millis();
+void setRotorSpeed(int flMotorSpeed, int frMotorSpeed, int rlMotorSpeed, int rrMotorSpeed) {
+	//currentTime = millis();
 
 	FL_MOTOR.write(flMotorSpeed);
 	FR_MOTOR.write(frMotorSpeed);
 	RL_MOTOR.write(rlMotorSpeed);
 	RR_MOTOR.write(rrMotorSpeed);
 }
-void CALIBRATE_ESC() {
+void escCalibration() {
 
 	unsigned long currentTime;
 	unsigned long deltaTime;
@@ -377,7 +385,7 @@ void CALIBRATE_ESC() {
 				Serial.print("Calibrating ESC!! ");
 				Serial.print("Current Throttle is ");
 				Serial.println(throttle);
-				SET_MOTOR_SPEED(flMotorSpeed, frMotorSpeed, rlMotorSpeed, rrMotorSpeed);
+				setRotorSpeed(flMotorSpeed, frMotorSpeed, rlMotorSpeed, rrMotorSpeed);
 				rotorUpperCal = true;
 				delay(2000);
 			}
@@ -399,7 +407,7 @@ void CALIBRATE_ESC() {
 				frMotorSpeed = throttle;
 				rlMotorSpeed = throttle;
 				rrMotorSpeed = throttle;
-				SET_MOTOR_SPEED(flMotorSpeed, frMotorSpeed, rlMotorSpeed, rrMotorSpeed);
+				setRotorSpeed(flMotorSpeed, frMotorSpeed, rlMotorSpeed, rrMotorSpeed);
 				rotorLowerCal = true;
 				delay(2000);
 			}
@@ -417,15 +425,36 @@ void CALIBRATE_ESC() {
 		}
 	}
 }
-void CALC_ANG_CORR() {
-	float zCorrFact = 8;
-	float yawFact = 2.2;
-	int controllerRoll_Min = controllerRoll - 25;  //Set to 25
-	int controllerRoll_Max = controllerRoll + 25;
-	int controllerPitch_Min = controllerPitch - 25;
-	int controllerPitch_Max = controllerPitch + 25;
-	int minRotorAdjust = -100; //Set to 25
-	int maxRotorAdjust = 100;
+void autoLeveling() {
+	double zCorrFact = 8;
+	double yawFact = 2.2;
+	
+	int minYPRAdj = (-(throttle - 650));
+	int maxYPRAdj = (2000 - throttle);
+	float rollAdjFact = 15;		// Y Adjust Factor. Decrease to increase rate of adjust.
+	float pitchAdjFact = 15;	// Y Adjust Factor. Decrease to increase rate of adjust.
+	//float yprMinMaxFactor = 20;
+	float minAngleAdj = -(throttle * .2);	//Minimum amount that roll/pitch can adjust. % of the current throttle
+	float maxAngleAdj = throttle * .2;		//Maximum amount that the roll/pitch can adjust. % of the current throttle
+
+	//float minAngleAdj = -(abs(yprMinMaxFactor * (roll)));
+	//float maxAngleAdj = abs(yprMinMaxFactor * (roll));
+	//float minAngleAdj = -(abs(yprMinMaxFactor * (pitch)));
+	//float maxAngleAdj = abs(yprMinMaxFactor * (pitch));
+	float rollAdj = (cRoll - (roll)) / rollAdjFact;
+	float pitchAdj = (cPitch - (pitch)) / pitchAdjFact;
+	float xGyroFactor = 7;
+	float yGyroFactor = 7;
+	
+	/*
+	int cRollMin = cRoll - 25;  //Set to 25
+	int cRollMax = cRoll + 25;
+	int cPitchMin = cPitch - 25;
+	int cPitchMax = cPitch + 25;
+	int minRotorAdjust = -25; //Set to 25
+	int maxRotorAdjust = 25;
+
+	*/
 
 	if (controllerYaw == 0) //Yaw AutoStabilize
 	{
@@ -439,50 +468,85 @@ void CALC_ANG_CORR() {
 	yawAutoCorr = constrain(yawAutoCorr, -150, 150);
 	yawAdjust = constrain(yawAdjust, -200, 200);
 
-	FL_Yaw_Adj = -yawAdjust;
-	FR_Yaw_Adj = yawAdjust;
-	RL_Yaw_Adj = yawAdjust;
-	RR_Yaw_Adj = -yawAdjust;
+	flYawAdj = -yawAdjust;
+	frYawAdj = yawAdjust;
+	rlYawAdj = yawAdjust;
+	rrYawAdj = -yawAdjust;
 
-	FL_Yaw_Corr = -yawAutoCorr;
-	FR_Yaw_Corr = yawAutoCorr;
-	RL_Yaw_Corr = yawAutoCorr;
-	RR_Yaw_Corr = -yawAutoCorr;
+	flYawCorr = -yawAutoCorr;
+	frYawCorr = yawAutoCorr;
+	rlYawCorr = yawAutoCorr;
+	rrYawCorr = -yawAutoCorr;
+	/*
+	flRollAdj = -(map(roll, cRollMin, cRollMax, minRotorAdjust, maxRotorAdjust));
+	rlRollAdj = -(map(roll, cRollMin, cRollMax, minRotorAdjust, maxRotorAdjust));
+	frRollAdj = map(roll, cRollMin, cRollMax, minRotorAdjust, maxRotorAdjust);
+	rrRollAdj = map(roll, cRollMin, cRollMax, minRotorAdjust, maxRotorAdjust);
 
-	FL_Roll_Adj = -(map(roll, controllerRoll_Min, controllerRoll_Max, minRotorAdjust, maxRotorAdjust));
-	FR_Roll_Adj = map(roll, controllerRoll_Min, controllerRoll_Max, minRotorAdjust, maxRotorAdjust);
-	RL_Roll_Adj = -(map(roll, controllerRoll_Min, controllerRoll_Max, minRotorAdjust, maxRotorAdjust));
-	RR_Roll_Adj = map(roll, controllerRoll_Min, controllerRoll_Max, minRotorAdjust, maxRotorAdjust);
+	flPitchAdj = -(map(pitch, cPitchMin, cPitchMax, minRotorAdjust, maxRotorAdjust));
+	frPitchAdj = -(map(pitch, cPitchMin, cPitchMax, minRotorAdjust, maxRotorAdjust));
+	rlPitchAdj = map(pitch, cPitchMin, cPitchMax, minRotorAdjust, maxRotorAdjust);
+	rrPitchAdj = map(pitch, cPitchMin, cPitchMax, minRotorAdjust, maxRotorAdjust);
+	
+	flYPRCorr = flRollAdj + flPitchAdj; // + flYawAdj + flYawCorr;
+	frYPRCorr = frRollAdj + frPitchAdj; // + frYawAdj + frYawCorr;
+	rlYPRCorr = rlRollAdj + rlPitchAdj; // + rlYawAdj + rlYawCorr;
+	rrYPRCorr = rrRollAdj + rrPitchAdj; // + rrYawAdj + rrYawCorr;
+	*/
 
-	FL_Pitch_Adj = -(map(pitch, controllerPitch_Min, controllerPitch_Max, minRotorAdjust, maxRotorAdjust));
-	FR_Pitch_Adj = -(map(pitch, controllerPitch_Min, controllerPitch_Max, minRotorAdjust, maxRotorAdjust));
-	RL_Pitch_Adj = map(pitch, controllerPitch_Min, controllerPitch_Max, minRotorAdjust, maxRotorAdjust);
-	RR_Pitch_Adj = map(pitch, controllerPitch_Min, controllerPitch_Max, minRotorAdjust, maxRotorAdjust);
+	flRollAdj = flRollAdj + rollAdj - (xGyro*xGyroFactor);	
+	rlRollAdj = rlRollAdj + rollAdj - (xGyro*xGyroFactor);
+	frRollAdj = frRollAdj - rollAdj + (xGyro*xGyroFactor);
+	rrRollAdj = rrRollAdj - rollAdj + (xGyro*xGyroFactor);
 
-	FL_YPR_Corr = FL_Roll_Adj + FL_Pitch_Adj + FL_Yaw_Adj + FL_Yaw_Corr;
-	FR_YPR_Corr = FR_Roll_Adj + FR_Pitch_Adj + FR_Yaw_Adj + FR_Yaw_Corr;
-	RL_YPR_Corr = RL_Roll_Adj + RL_Pitch_Adj + RL_Yaw_Adj + RL_Yaw_Corr;
-	RR_YPR_Corr = RR_Roll_Adj + RR_Pitch_Adj + RR_Yaw_Adj + RR_Yaw_Corr;
+	flRollAdj = constrain(flRollAdj, minAngleAdj, maxAngleAdj);
+	rlRollAdj = constrain(rlRollAdj, minAngleAdj, maxAngleAdj);
+	frRollAdj = constrain(frRollAdj, minAngleAdj, maxAngleAdj);
+	rrRollAdj = constrain(rrRollAdj, minAngleAdj, maxAngleAdj);
+
+	flPitchAdj = flPitchAdj + pitchAdj + (yGyro*yGyroFactor);
+	frPitchAdj = frPitchAdj + pitchAdj + (yGyro*yGyroFactor);
+	rlPitchAdj = rlPitchAdj - pitchAdj - (yGyro*yGyroFactor);
+	rrPitchAdj = rrPitchAdj - pitchAdj - (yGyro*yGyroFactor);
+
+	flPitchAdj = constrain(flPitchAdj, minAngleAdj, maxAngleAdj);
+	frPitchAdj = constrain(frPitchAdj, minAngleAdj, maxAngleAdj);
+	rlPitchAdj = constrain(rlPitchAdj, minAngleAdj, maxAngleAdj);
+	rrPitchAdj = constrain(rrPitchAdj, minAngleAdj, maxAngleAdj);
+
+
+	flYPRCorr = flRollAdj + flPitchAdj;// +flYawAdj + flYawCorr; ?? Possible try and get the average????
+	flYPRCorr = constrain(flYPRCorr, minYPRAdj, maxYPRAdj);
+	frYPRCorr = frRollAdj + frPitchAdj;// +frYawAdj + frYawCorr;
+	frYPRCorr = constrain(frYPRCorr, minYPRAdj, maxYPRAdj);
+	rlYPRCorr = rlRollAdj + rlPitchAdj;// +rlYawAdj + rlYawCorr;
+	rlYPRCorr = constrain(rlYPRCorr, minYPRAdj, maxYPRAdj);
+	rrYPRCorr = rrRollAdj + rrPitchAdj;// +rrYawAdj + rrYawCorr;
+	rrYPRCorr = constrain(rrYPRCorr, minYPRAdj, maxYPRAdj);
+
+
+
+
 }
-void CALC_GYRO_CORR() {
-	float gyroCorrFact = 90;
+void calcGyroCorr() {
+	float gyroCorrFact = 75;
 	xGyroCorr = constrain(xGyro * gyroCorrFact, -200, 200);
 	yGyroCorr = constrain(yGyro * gyroCorrFact, -200, 200);
 }
-void CALC_ACCEL_CORR() {
+void calcAccelCorr() {
 	float accelCorrFact = 50;
 	float zaccelCorrFact = 50;
 	xAccelCorr = constrain(xaReal * accelCorrFact, -200, 200);
 	yAccelCorr = constrain(yaReal * accelCorrFact, -200, 200);
 	zAccelCorr = constrain(zaReal * zaccelCorrFact, -500, 500);
 }
-void GET_GYRO() {
+void getGyro() {
 	mpu.dmpGetGyro(gyro, fifoBuffer);
 	xGyro = gyro[0] * gRes;
 	yGyro = gyro[1] * gRes;
 	zGyro = gyro[2] * gRes;
 }
-void GET_ACCEL() {
+void getAccel() {
 	// display real acceleration, adjusted to remove gravity
 	mpu.dmpGetQuaternion(&q, fifoBuffer);
 	mpu.dmpGetAccel(&aa, fifoBuffer);
@@ -492,13 +556,13 @@ void GET_ACCEL() {
 	yaReal = aaReal.y * aRes;
 	zaReal = aaReal.z * aRes;
 }
-void GET_YPR() {
+void getYPR() {
 	mpu.dmpGetQuaternion(&q, fifoBuffer);
 	mpu.dmpGetGravity(&gravity, &q);
 	mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
 	yaw = (ypr[0] * 180 / M_PI), pitch = (ypr[1] * 180 / M_PI), roll = (ypr[2] * 180 / M_PI);
 }
-void SET_MPU_OFFSET() {
+void setMPUOffset() {
 	mpu.setXAccelOffset(-1425);
 	mpu.setYAccelOffset(1228);
 	mpu.setZAccelOffset(1620); // 1688 factory default for my test chip
@@ -506,7 +570,7 @@ void SET_MPU_OFFSET() {
 	mpu.setYGyroOffset(97); // Default 76
 	mpu.setZGyroOffset(60); // Default -85
 }
-void GET_DMP_MOTION6() {
+void getDMPMotion6() {
 	mpu.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
 	int start = millis(); Serial.print(start); Serial.print("\t");
 	Serial.print(ax); Serial.print("\t");
@@ -516,25 +580,25 @@ void GET_DMP_MOTION6() {
 	Serial.print(gy); Serial.print("\t");
 	Serial.println(gz);
 }
-void SET_MPU_SCALE() {
-	mpu.setFullScaleAccelRange(MPU6050_ACCEL_FS_2);
-	mpu.setFullScaleGyroRange(MPU6050_GYRO_FS_250);
+void setMPUScale() {
+	mpu.setFullScaleAccelRange(MPU6050_ACCEL_FS_4);
+	mpu.setFullScaleGyroRange(MPU6050_GYRO_FS_500);
 }
-void DMP_DATA_READY() {
+void dmpDataReady() {
 	mpuInterrupt = true;
 }
-void DETECT_STABLE_YAW() {
+void detectStableYaw() {
 	unsigned long prevTime = 0;
 	float oldYaw = 0;
-	READ_MPU_DATA();
+	readMPUData();
 	unsigned long currentTime;
 	unsigned long deltaTime;
 	while (unstableYaw)
 	{
-		READ_MPU_DATA();
+		readMPUData();
 		currentTime = millis();
 		deltaTime = currentTime - prevTime;
-		READ_MPU_DATA();
+		readMPUData();
 		if (deltaTime > 1000)
 		{
 			Serial.println(yaw);
@@ -559,7 +623,7 @@ void DETECT_STABLE_YAW() {
 		}
 	}
 }
-void READ_MPU_DATA() {
+void readMPUData() {
 	// if programming failed, don't try to do anything
 	if (!dmpReady) return;
 
@@ -603,12 +667,12 @@ void READ_MPU_DATA() {
 		// (this lets us immediately read more without waiting for an interrupt)
 		fifoCount -= packetSize;
 
-		GET_GYRO();
-		GET_ACCEL();
-		GET_YPR();
+		getGyro();
+		getAccel();
+		getYPR();
 	}
 }
-void SERIAL_DEBUG()
+void serialDebug()
 {
 	Serial.println("##################################################################################################################################################");
 	Serial.println("##################################################################################################################################################");
@@ -629,14 +693,12 @@ void SERIAL_DEBUG()
 
 	if (yprDebug) {
 		Serial.println("--------Yaw, Pitch, Roll Values--------");
-		Serial.println("Yaw:\t\tPitch:\t\tRoll:");
+		Serial.println("Yaw: ");
 		Serial.print(yaw);
-		Serial.print("\t\t");
+		Serial.print("Pitch: ");
 		Serial.print(pitch);
-		Serial.print("\t\t");
+		Serial.print("Roll: ");
 		Serial.println(roll);
-		Serial.println("***************************************");
-		Serial.println();
 	}
 
 	//Real Acceleration
@@ -672,9 +734,9 @@ void SERIAL_DEBUG()
 		Serial.println("Throttle:\t\tController X:\t\tController Y:\t\tYaw Position: ");
 		Serial.print(throttle);
 		Serial.print("\t\t\t\t");
-		Serial.print(controllerRoll);
+		Serial.print(cRoll);
 		Serial.print("\t\t\t");
-		Serial.print(controllerPitch);
+		Serial.print(cPitch);
 		Serial.print("\t\t\t");
 		Serial.println(controller[1]);
 		Serial.println("*****************************************************************************");
@@ -699,33 +761,33 @@ void SERIAL_DEBUG()
 	if (droneDebug)
 	{
 		Serial.println("-----------------------------------------------Drone Summary Values------------------------------------------------");
-		Serial.println("Throttle\tYaw\tPitch\tRoll\tX Gyro\tY Gyro\tZ Gyro\tX Accel\tY accel\tZ Accel\tFL ESC\tFR ESC\tRL ESC\tRR ESC");
+		Serial.print("Throttle: ");
 		Serial.print(throttle);
-		Serial.print("\t\t");
+		Serial.print("\tYaw: ");
 		Serial.print(yaw);
-		Serial.print("\t");
+		Serial.print("\tPitch: ");
 		Serial.print(pitch);
-		Serial.print("\t");
+		Serial.print("\tRoll: ");
 		Serial.print(roll);
-		Serial.print("\t");
+		Serial.print("\tx Gyro: ");
 		Serial.print(xGyro);
-		Serial.print("\t");
+		Serial.print("\ty Gyro: ");
 		Serial.print(yGyro);
-		Serial.print("\t");
+		Serial.print("\tz Gyro: ");
 		Serial.print(zGyro);
-		Serial.print("\t");
+		Serial.print("\tx Accel: ");
 		Serial.print(xaReal);
-		Serial.print("\t");
+		Serial.print("\ty Accel: ");
 		Serial.print(yaReal);
-		Serial.print("\t");
-		Serial.print(zaReal);
-		Serial.print("\t");
+		Serial.print("\tz Accel: ");
+		Serial.println(zaReal);
+		Serial.print("FL ESC: ");
 		Serial.print(flMotorSpeed);
-		Serial.print("\t");
+		Serial.print("\tFR ESC: ");
 		Serial.print(frMotorSpeed);
-		Serial.print("\t");
+		Serial.print("\tRL ESC: ");
 		Serial.print(rlMotorSpeed);
-		Serial.print("\t");
+		Serial.print("\tRR ESC: ");
 		Serial.println(rrMotorSpeed);
 		Serial.println("*********************************************************************************************************************");
 		Serial.println();
@@ -733,37 +795,35 @@ void SERIAL_DEBUG()
 	if (correctionFactors)
 	{
 		Serial.println("-----------------------------------------------Correction Values being applied--------------------------------------------------------");
-		Serial.println("Thottle\tYaw Stabilize\tFL R\tFR R\tRL R\tRR R\tFL P\tFR P\tRL P\tRR P\tX Gyro\tY Gyr\tZ Gyro\tX Accel\tY Accel\tZ Accel");
+		Serial.print("Throttle: ");
 		Serial.print(throttle);
-		Serial.print("\t");
-		Serial.print(yawAutoCorr);
-		Serial.print("\t\t");
-		Serial.print(FL_Roll_Adj);
-		Serial.print("\t");
-		Serial.print(FR_Roll_Adj);
-		Serial.print("\t");
-		Serial.print(RL_Roll_Adj);
-		Serial.print("\t");
-		Serial.print(RR_Roll_Adj);
-		Serial.print("\t");
-		Serial.print(FL_Pitch_Adj);
-		Serial.print("\t");
-		Serial.print(FR_Pitch_Adj);
-		Serial.print("\t");
-		Serial.print(RL_Pitch_Adj);
-		Serial.print("\t");
-		Serial.print(RR_Pitch_Adj);
-		Serial.print("\t");
+		Serial.print("\tYaw:\t");
+		Serial.println(yawAutoCorr);
+		Serial.print("FL Roll:\t");
+		Serial.print(flRollAdj);
+		Serial.print("\tFR Roll:\t");
+		Serial.print(frRollAdj);
+		Serial.print("\tRL Roll:\t");
+		Serial.print(rlRollAdj);
+		Serial.print("\tRR Roll:\t");
+		Serial.println(rrRollAdj);
+		Serial.print("FL Pitch:\t");
+		Serial.print(flPitchAdj);
+		Serial.print("\tFR Pitch:\t");
+		Serial.print(frPitchAdj);
+		Serial.print("\tRL Pitch:\t");
+		Serial.print(rlPitchAdj);
+		Serial.print("\tRR Pitch:\t");
+		Serial.println(rrPitchAdj);
+		Serial.print("X Gyro:\t\t");
 		Serial.print(xGyroCorr);
-		Serial.print("\t");
-		Serial.print(yGyroCorr);
-		Serial.print("\t");
-		Serial.print(xGyroCorr);
-		Serial.print("\t");
+		Serial.print("\tY Gyro:\t");
+		Serial.println(yGyroCorr);
+		Serial.print("X Accel:\t");
 		Serial.print(xAccelCorr);
-		Serial.print("\t");
+		Serial.print("\tY Accel:\t");
 		Serial.print(yAccelCorr);
-		Serial.print("\t");
+		Serial.print("\tZ Accel:\t");
 		Serial.println(zAccelCorr);
 		Serial.println("***************************************************************************************************************************************");
 		Serial.println();
