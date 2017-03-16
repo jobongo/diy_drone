@@ -119,7 +119,7 @@ uint8_t intPin = 2;
 
 /* ================= CONTROLLER VARIABLES ================== */
 
-int16_t controller[4]; // Array to hold data sent from controller.
+float controller[10]; // Array to hold data sent from controller.
 int throttle;			//Throttle position from controller.			<---- initialize variables here?
 int cRoll;		// Position of Joystick X Axis (ROLL).
 int cPitch;	// Position of Joystick Y (PITCH).            
@@ -146,29 +146,30 @@ float dRoll = 0; // D value for Roll.
 float dPitch = 0; // D value for Pitch.
 float dYaw = 0; // D value for Yaw.
 
-float pRollFactor = 1; //Value multiplied by PID values above for tuning of drone.  
-float iRollFactor = .05; 
-float dRollFactor = 5; 
+//Value multiplied by PID values above for tuning of drone
+float pRollFactor;// = 4.8; // 7.5 -- 8045 Props and 3s Battery
+float iRollFactor;// = .02; // .025 -- 8045 Props and 3s Battery
+float dRollFactor;// = 19; // 17 -- 8045 Props and 3s Battery
 
-float pPitchFactor = 1;
-float iPitchFactor = .05;
-float dPitchFactor = 5;
+float pPitchFactor;
+float iPitchFactor;
+float dPitchFactor;
 
-float pYawFactor = 1;
-float iYawFactor = .05;
-float dYawFactor = 5;
+float pYawFactor;// = 21;
+float iYawFactor;// = .009;
+float dYawFactor;// = 0;
 
-float pidRollOutput = 0;
-float pidPitchOutput = 0;
-float pidYawOutput = 0;
+float pidRollOutput;
+float pidPitchOutput;
+float pidYawOutput;
 
 float pRollPrev;
 float pPitchPrev;
 float pYawPrev;
 
-float pidMaxRoll = 400;
-float pidMaxPitch = 400;
-float pidMaxYaw = 200;
+float pidMaxRoll;
+float pidMaxPitch;
+float pidMaxYaw;
 
 
 /* ===================== MISCELLANEOUS ===================== */
@@ -208,7 +209,7 @@ bool aDebug = false; // Output Accelerometer Values
 bool gDebug = false; // Ouput Gyroscope Values
 bool yprDebug = false; // Output Yaw, Pitch, Roll Values
 bool dmpDebug = false; // Output DMP Values Only
-bool controlDebug = false; //Output values received from controller
+bool controlDebug = true; //Output values received from controller
 bool finalThrottle = false;
 bool droneDebug = true;
 bool correctionFactors = true;
@@ -329,14 +330,24 @@ void fly() {
 	cYaw = controller[1];
 	cRoll = controller[2];
 	cPitch = controller[3];
+	pRollFactor = controller[4];
+	iRollFactor = controller[5];
+	dRollFactor = controller[6];
+	pYawFactor = controller[7];
+	iYawFactor = controller[8];
+	dYawFactor = controller[9];
+
+	pPitchFactor = pRollFactor;
+	iPitchFactor = iRollFactor;
+	dPitchFactor = dRollFactor;
 
 	getGyro();
 	autoLeveling();
 
 	flMotorSpeed = throttle - pidRollOutput - pidPitchOutput + pidYawOutput;
-	frMotorSpeed = throttle + pidRollOutput - pidPitchOutput - pidYawOutput;
-	rlMotorSpeed = throttle - pidRollOutput + pidPitchOutput - pidYawOutput;
-	rrMotorSpeed = throttle + pidRollOutput + pidPitchOutput + pidYawOutput;
+	frMotorSpeed = throttle + pidRollOutput - pidPitchOutput -pidYawOutput;
+	rlMotorSpeed = throttle - pidRollOutput + pidPitchOutput -pidYawOutput;
+	rrMotorSpeed = throttle + pidRollOutput + pidPitchOutput +pidYawOutput;
 
 	flMotorSpeed = constrain(flMotorSpeed, 650, 2000);
 	frMotorSpeed = constrain(frMotorSpeed, 650, 2000);
@@ -445,20 +456,24 @@ void escCalibration() {
 	}
 }
 void autoLeveling() {
-
-
-
+	pidMaxRoll = (throttle * .1);
+	pidMaxPitch = (throttle * .1);
+	pidMaxYaw = (throttle * .1);
+	//yaw = yaw - heading;
 	pRoll = ((roll - (cRoll)) * pRollFactor); // Get the P value for Roll
 	iRoll += (pRoll * iRollFactor); // Get the I value for the Roll
+
 	if (iRoll > pidMaxRoll) { 
 		iRoll = pidMaxRoll; 
 	}
 	else if (iRoll < -pidMaxRoll) {
 		iRoll = -pidMaxRoll; 
 	}
+
 	dRoll = ((pRoll - (pRollPrev)) * dRollFactor);
 	pidRollOutput = pRoll + iRoll + dRoll;
 	pRollPrev = pRoll;
+
 	if (pidRollOutput > pidMaxRoll) { // Limit the maximum of the roll correction to be applied to 400
 		pidRollOutput = pidMaxRoll; 
 	}							
@@ -466,19 +481,20 @@ void autoLeveling() {
 		pidRollOutput = -pidMaxRoll;
 	} 
 
-
-
 	pPitch = ((pitch - (cPitch)) * pPitchFactor); // Get the P value for Pitch
 	iPitch += (iPitchFactor * pPitch); //Get the I value for the Pitch
+
 	if (iPitch > pidMaxPitch) {
 		iPitch = pidMaxPitch; 
 	}
 	else if (iPitch < -pidMaxPitch) {
 		iPitch = -pidMaxPitch; 
 	}
+
 	dPitch = ((pPitch - (pPitchPrev)) * dPitchFactor);
 	pidPitchOutput = pPitch + iPitch + dPitch;
 	pPitchPrev = pPitch;
+
 	if (pidPitchOutput > pidMaxPitch) { 
 		pidPitchOutput = pidMaxPitch; 
 	}
@@ -486,15 +502,16 @@ void autoLeveling() {
 		pidPitchOutput = -pidMaxPitch; 
 	}
 
-
 	pYaw = ((yaw - (cYaw)) * pYawFactor); // Get the P value for the Yaw
 	iYaw += (iYawFactor * pYaw); // Get the I value for the Yaw
+
 	if (iYaw > pidMaxYaw) {
 		iYaw = pidMaxYaw;
 	}
 	if (iYaw < -pidMaxYaw) {
 		iYaw = -pidMaxYaw;
 	}
+
 	dYaw = ((pYaw - (pYawPrev)) * dYawFactor);
 	pidYawOutput = pYaw + iYaw + dYaw;
 	pYawPrev = pYaw;
@@ -524,13 +541,13 @@ void getGyro() {
 	yGyro = gy / 57.14286;
 	zGyro = gz / 57.14286;
 
-	if (((xGyro < .15) && (xGyro > 0)) || ((xGyro < 0) && (xGyro > -.15))) {
+	if (((xGyro < .2) && (xGyro > 0)) || ((xGyro < 0) && (xGyro > -.2))) {
 		xGyro = 0;
 	}
-	if (((yGyro < .15) && (yGyro > 0)) || ((yGyro < 0) && (yGyro > -.15))) {
+	if (((yGyro < .2) && (yGyro > 0)) || ((yGyro < 0) && (yGyro > -.2))) {
 		yGyro = 0;
 	}
-	if (((zGyro < .15) && (zGyro > 0)) || ((zGyro < 0) && (zGyro > -.15))) {
+	if (((zGyro < .2) && (zGyro > 0)) || ((zGyro < 0) && (zGyro > -.2))) {
 		zGyro = 0;
 	}
 	
@@ -550,11 +567,24 @@ void getYPR() {
 	mpu.dmpGetGravity(&gravity, &q);
 	mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
 	yaw = (ypr[0] * 180 / M_PI), pitch = (ypr[1] * 180 / M_PI), roll = (ypr[2] * 180 / M_PI);
+
+	if (((roll < .5) && (roll > 0)) || ((roll > -.5) && (roll < 0))) {
+		roll = 0;
+	}
+	if ((pitch < .5) && (pitch > -.5)){
+		pitch = 0;
+	}
+	//if (yaw < 0) {
+	//	yaw = yaw + 360;
+	//}
+	//if (((yaw < .5) && (yaw > 0)) || ((yaw > -1) && (yaw < 0))) {
+	//	yaw = 0;
+	//}
 }
 void setMPUOffset() {
 	mpu.setXAccelOffset(-1420);
 	mpu.setYAccelOffset(1185);
-	mpu.setZAccelOffset(1515); // 1688 factory default for my test chip
+	mpu.setZAccelOffset(1530); // 1688 factory default for my test chip
 	mpu.setXGyroOffset(127); //Default 220
 	mpu.setYGyroOffset(71); // Default 76
 	mpu.setZGyroOffset(0); // Default -85
@@ -783,7 +813,7 @@ void serialDebug()
 	}
 	if (correctionFactors)
 	{
-		Serial.println("-----------------------------------------------Correction Values being applied--------------------------------------------------------");
+		Serial.println("-----------------------------------------------Correction Values --------------------------------------------------------");
 		Serial.print("Throttle: ");
 		Serial.print(throttle);
 		Serial.print("\tYaw:\t");
@@ -792,6 +822,7 @@ void serialDebug()
 		Serial.print("Roll:\t");
 		Serial.print(pidRollOutput);
 		Serial.print("\t");
+		Serial.print("Pitch:\t");
 		Serial.print(pidPitchOutput);
 		Serial.print("\t");
 		Serial.print("FL Rotor:\t");
@@ -805,6 +836,28 @@ void serialDebug()
 		Serial.print("\t");
 		Serial.print("RR Rotor:\t");
 		Serial.println(rrMotorSpeed);
+		Serial.println("***************************************************************************************************************************************");
+		Serial.println();
+	}
+	if (correctionFactors)
+	{
+		Serial.println("-----------------------------------------------Control PID Values --------------------------------------------------------");
+		Serial.print("Controller P Roll: ");
+		Serial.print(pRollFactor, 4);
+		Serial.print("\tController I Roll:");
+		Serial.print(iRollFactor, 4);
+		Serial.print("\t");
+		Serial.print("Controller D Roll:\t");
+		Serial.print(dRollFactor, 4);
+		Serial.print("\t");
+		Serial.print("Controller P Yaw:\t");
+		Serial.print(pYawFactor, 4);
+		Serial.print("\t");
+		Serial.print("Controller I Yaw:\t");
+		Serial.print(iYawFactor, 4);
+		Serial.print("\t");
+		Serial.print("Controller D Yaw:\t");
+		Serial.println(dYawFactor, 4);
 		Serial.println("***************************************************************************************************************************************");
 		Serial.println();
 	}
