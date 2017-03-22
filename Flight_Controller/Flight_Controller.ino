@@ -119,7 +119,9 @@ uint8_t intPin = 2;
 
 /* ================= CONTROLLER VARIABLES ================== */
 
-float controller[10]; // Array to hold data sent from controller.
+//float controller[10]; // Array to hold data sent from controller.
+float controller[4]; // Array to hold data sent from controller.
+
 int throttle;			//Throttle position from controller.			<---- initialize variables here?
 int cRoll;		// Position of Joystick X Axis (ROLL).
 int cPitch;	// Position of Joystick Y (PITCH).            
@@ -147,17 +149,20 @@ float dPitch = 0; // D value for Pitch.
 float dYaw = 0; // D value for Yaw.
 
 //Value multiplied by PID values above for tuning of drone
-float pRollFactor;// = 4.8; // 7.5 -- 8045 Props and 3s Battery
-float iRollFactor;// = .02; // .025 -- 8045 Props and 3s Battery
-float dRollFactor;// = 19; // 17 -- 8045 Props and 3s Battery
 
-float pPitchFactor;
-float iPitchFactor;
-float dPitchFactor;
+float pRollFactor = 5.0; // 7.5 -- 8045 Props and 3s Battery
+float iRollFactor = 0.0293; // .025 -- 8045 Props and 3s Battery
+float dRollFactor = 15.6166; // 17 -- 8045 Props and 3s Battery
 
-float pYawFactor;// = 21;
-float iYawFactor;// = .009;
-float dYawFactor;// = 0;
+float pPitchFactor = pRollFactor;
+float iPitchFactor = iRollFactor;
+float dPitchFactor = dRollFactor;
+
+float pYawFactor = 10.2;
+float iYawFactor = 0.0200;
+float dYawFactor = 0.0;
+
+
 
 float pidRollOutput;
 float pidPitchOutput;
@@ -178,7 +183,8 @@ bool rotorLowerCal = false;
 bool rotorUpperCal = false;
 bool rotorsCalibrated = false;
 bool unstableYaw = true;
-float heading;
+float heading = 0;
+
 
 /* ======================== MPU 6050 ======================= */
 
@@ -292,7 +298,7 @@ void setup() {
 
 	escCalibration();			//Run ESC Calibration before flying. Checks minimum and maximum throttle positions. 
 								//This is written for SimonK firmwares with a pulsewidth range of ~600 - 2000
-	//detectStableYaw();
+	detectStableYaw();
 }
 
 /* ========================== MAIN ========================= */
@@ -330,31 +336,33 @@ void fly() {
 	cYaw = controller[1];
 	cRoll = controller[2];
 	cPitch = controller[3];
+	/*
 	pRollFactor = controller[4];
 	iRollFactor = controller[5];
 	dRollFactor = controller[6];
+	
 	pYawFactor = controller[7];
 	iYawFactor = controller[8];
 	dYawFactor = controller[9];
-
+	
 	pPitchFactor = pRollFactor;
 	iPitchFactor = iRollFactor;
 	dPitchFactor = dRollFactor;
-
+	*/
 	getGyro();
 	autoLeveling();
 
-	flMotorSpeed = throttle - pidRollOutput - pidPitchOutput + pidYawOutput;
-	frMotorSpeed = throttle + pidRollOutput - pidPitchOutput -pidYawOutput;
-	rlMotorSpeed = throttle - pidRollOutput + pidPitchOutput -pidYawOutput;
-	rrMotorSpeed = throttle + pidRollOutput + pidPitchOutput +pidYawOutput;
+	flMotorSpeed = throttle - pidYawOutput - pidRollOutput - pidPitchOutput;
+	frMotorSpeed = throttle + pidYawOutput + pidRollOutput - pidPitchOutput;
+	rlMotorSpeed = throttle + pidYawOutput - pidRollOutput + pidPitchOutput;
+	rrMotorSpeed = throttle - pidYawOutput + pidRollOutput + pidPitchOutput;
 
 	flMotorSpeed = constrain(flMotorSpeed, 650, 2000);
 	frMotorSpeed = constrain(frMotorSpeed, 650, 2000);
 	rlMotorSpeed = constrain(rlMotorSpeed, 650, 2000);
 	rrMotorSpeed = constrain(rrMotorSpeed, 650, 2000);
 
-	if (throttle >700)
+	if (throttle >800)
 	{
 		setRotorSpeed(flMotorSpeed, frMotorSpeed, rlMotorSpeed, rrMotorSpeed);
 	}
@@ -456,10 +464,12 @@ void escCalibration() {
 	}
 }
 void autoLeveling() {
-	pidMaxRoll = (throttle * .1);
-	pidMaxPitch = (throttle * .1);
-	pidMaxYaw = (throttle * .1);
-	//yaw = yaw - heading;
+	pidMaxRoll = (throttle * .2);
+	pidMaxPitch = (throttle * .2);
+	pidMaxYaw = (throttle * .2);
+
+// --------------------------------------------Roll Correction--------------------------------------------//
+
 	pRoll = ((roll - (cRoll)) * pRollFactor); // Get the P value for Roll
 	iRoll += (pRoll * iRollFactor); // Get the I value for the Roll
 
@@ -480,6 +490,8 @@ void autoLeveling() {
 	else if (pidRollOutput < -pidMaxRoll) { // Limit the minimum of the roll correction to be applied to -400
 		pidRollOutput = -pidMaxRoll;
 	} 
+
+// --------------------------------------------Pitch Correction--------------------------------------------//
 
 	pPitch = ((pitch - (cPitch)) * pPitchFactor); // Get the P value for Pitch
 	iPitch += (iPitchFactor * pPitch); //Get the I value for the Pitch
@@ -502,7 +514,9 @@ void autoLeveling() {
 		pidPitchOutput = -pidMaxPitch; 
 	}
 
-	pYaw = ((yaw - (cYaw)) * pYawFactor); // Get the P value for the Yaw
+// --------------------------------------------Yaw Correction--------------------------------------------//
+
+	pYaw = ((zGyro - (cYaw)) * pYawFactor); // Get the P value for the Yaw
 	iYaw += (iYawFactor * pYaw); // Get the I value for the Yaw
 
 	if (iYaw > pidMaxYaw) {
@@ -512,7 +526,8 @@ void autoLeveling() {
 		iYaw = -pidMaxYaw;
 	}
 
-	dYaw = ((pYaw - (pYawPrev)) * dYawFactor);
+	dYaw = ((zGyro - (pYawPrev)) * dYawFactor);
+
 	pidYawOutput = pYaw + iYaw + dYaw;
 	pYawPrev = pYaw;
 	
@@ -523,13 +538,6 @@ void autoLeveling() {
 		pidYawOutput = -pidMaxYaw;
 	}
 
-/*
-	Serial.print(pidRollOutput);
-	Serial.print("\t");
-	Serial.print(pidPitchOutput);
-	Serial.print("\t");
-	Serial.println(pidYawOutput);
-*/
 }
 
 void getGyro() {
@@ -541,15 +549,15 @@ void getGyro() {
 	yGyro = gy / 57.14286;
 	zGyro = gz / 57.14286;
 
-	if (((xGyro < .2) && (xGyro > 0)) || ((xGyro < 0) && (xGyro > -.2))) {
-		xGyro = 0;
-	}
-	if (((yGyro < .2) && (yGyro > 0)) || ((yGyro < 0) && (yGyro > -.2))) {
-		yGyro = 0;
-	}
-	if (((zGyro < .2) && (zGyro > 0)) || ((zGyro < 0) && (zGyro > -.2))) {
-		zGyro = 0;
-	}
+	//if (((xGyro < .2) && (xGyro > 0)) || ((xGyro < 0) && (xGyro > -.2))) {
+		//xGyro = 0;
+	//}
+	//if (((yGyro < .2) && (yGyro > 0)) || ((yGyro < 0) && (yGyro > -.2))) {
+		//yGyro = 0;
+	//}
+	//if ((zGyro < .05) && (zGyro > -.05)) {
+		//zGyro = 0;
+	//}
 	
 }
 void getAccel() {
@@ -558,6 +566,7 @@ void getAccel() {
 	mpu.dmpGetAccel(&aa, fifoBuffer);
 	mpu.dmpGetGravity(&gravity, &q);
 	mpu.dmpGetLinearAccel(&aaReal, &aa, &gravity);
+
 	xaReal = aaReal.x * aRes;
 	yaReal = aaReal.y * aRes;
 	zaReal = aaReal.z * aRes;
@@ -566,28 +575,26 @@ void getYPR() {
 	mpu.dmpGetQuaternion(&q, fifoBuffer);
 	mpu.dmpGetGravity(&gravity, &q);
 	mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
-	yaw = (ypr[0] * 180 / M_PI), pitch = (ypr[1] * 180 / M_PI), roll = (ypr[2] * 180 / M_PI);
 
-	if (((roll < .5) && (roll > 0)) || ((roll > -.5) && (roll < 0))) {
+	yaw = (ypr[0] * 180 / M_PI);
+	pitch = (ypr[1] * 180 / M_PI);
+	roll = (ypr[2] * 180 / M_PI);
+	/*
+	if ((roll < 1) && (roll > -1)) {
 		roll = 0;
 	}
-	if ((pitch < .5) && (pitch > -.5)){
+	if ((pitch < 1) && (pitch > -1)){
 		pitch = 0;
 	}
-	//if (yaw < 0) {
-	//	yaw = yaw + 360;
-	//}
-	//if (((yaw < .5) && (yaw > 0)) || ((yaw > -1) && (yaw < 0))) {
-	//	yaw = 0;
-	//}
+	*/
 }
 void setMPUOffset() {
-	mpu.setXAccelOffset(-1420);
-	mpu.setYAccelOffset(1185);
-	mpu.setZAccelOffset(1530); // 1688 factory default for my test chip
-	mpu.setXGyroOffset(127); //Default 220
-	mpu.setYGyroOffset(71); // Default 76
-	mpu.setZGyroOffset(0); // Default -85
+	mpu.setXAccelOffset(-1410);
+	mpu.setYAccelOffset(1215);
+	mpu.setZAccelOffset(1555); // 1688 factory default for my test chip
+	mpu.setXGyroOffset(133); //Default 220
+	mpu.setYGyroOffset(57); // Default 76
+	mpu.setZGyroOffset(19); // Default -85
 }
 void getDMPMotion6() {
 	mpu.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
@@ -618,7 +625,7 @@ void detectStableYaw() {
 		currentTime = millis();
 		deltaTime = currentTime - prevTime;
 		readMPUData();
-		if (deltaTime > 1000)
+		if (deltaTime > 2000)
 		{
 			Serial.println(yaw);
 			float yawDiff = abs(yaw - oldYaw);

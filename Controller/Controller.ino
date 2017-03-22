@@ -23,7 +23,7 @@ Y Potentiometer to Arduino A1
 #define pitchPin A1
 #define throttlePin A2
 #define yawPin A3
-
+/*
 #define RP_P_PIN A9
 #define RP_I_PIN A8
 #define RP_D_PIN A7
@@ -31,7 +31,7 @@ Y Potentiometer to Arduino A1
 #define Y_P_PIN A6
 #define Y_I_PIN A5
 #define Y_D_PIN A4
-
+*/
 
 
 
@@ -53,8 +53,11 @@ const uint64_t pipe = 0xFFFFLL; // Define the transmit pipe
 RF24 radio(radioCEPin, radioCSNPin); // Create a Radio
 							 /*-----( Declare Variables )-----*/
 
-float controller[10];  // 5 element array holding Joystick Readings, Throttle, and X, Y Zeroized positions
-						//Define Joystick Variables
+//float controller[10];  // 5 element array holding Joystick Readings, Throttle, and X, Y Zeroized positions
+float controller[4];  // 5 element array holding Joystick Readings, Throttle, and X, Y Zeroized positions
+
+
+//Define Joystick Variables
 int xInputZero;
 int yInputZero;
 int xInputValue;
@@ -68,6 +71,7 @@ float RP_D_Corr;
 float Y_P_Corr;
 float Y_I_Corr;
 float Y_D_Corr;
+
 
 float pRollFactor;
 float iRollFactor;
@@ -89,21 +93,21 @@ int maxRoll = 30;
 int minPitch = minRoll;
 int maxPitch = maxRoll;
 
-int minYawAdj = -5; // Raise this to get higher resolution of tuning for yaw adjustmet.
-int maxYawAdj = 5;
-float yawGain = 3; // Lower this to increase rate of rotation
+int minYawAdj = -75; // Raise this to get higher resolution of tuning for yaw adjustmet.
+int maxYawAdj = 75;
 //----------------------        Setup       --------------------------//
 //----------------------********************--------------------------//
 
 void setup()
 {
+	analogReadRes(12);
+	analogReadAveraging(40);
 	//Serial.begin(115200); Uncomment if using arduino. Not needed with Teensy.
 	radio.begin();
 	radio.setDataRate(RF24_2MBPS);
 	radio.setRetries(15, 15);
 	radio.setPALevel(RF24_PA_LOW);
 	radio.setChannel(52);
-	//radio.setPayloadSize(64);
 	radio.openWritingPipe(pipe);
 
 	//
@@ -117,12 +121,11 @@ void setup()
 	delay(200);
 	yawZero = analogRead(yawPin);
 	delay(200);
-}//--(end setup )---
 
+}//--(end setup )---
 
  //----------------------      Main Loop     --------------------------//
  //----------------------********************--------------------------//
-
 
 void loop()
 {
@@ -135,19 +138,21 @@ void loop()
 	xInputValue = setRoll();
 	yInputValue = setPitch();
 	throttle = setThrottle();
-	calibratePID();
-
+	//calibratePID();
 
 	controller[0] = throttle;
-	controller[1] = yawValue;
+	controller[1] = yawPinValue;
 	controller[2] = xInputValue;
 	controller[3] = yInputValue;
+	/*
 	controller[4] = pRollFactor;
 	controller[5] = iRollFactor;
 	controller[6] = dRollFactor;
+
 	controller[7] = pYawFactor;
 	controller[8] = iYawFactor;
 	controller[9] = dYawFactor;
+	*/
 
 	radio.write(controller, sizeof(controller));
 
@@ -169,7 +174,7 @@ void loop()
 	Serial.print(throttle);
 	Serial.print(" ");
 	Serial.print("Yaw Adjust: \t");
-	Serial.println(yawValue);
+	Serial.println(yawPinValue);
 	Serial.println(" ");
 	Serial.println("**********************************************************************************************************************");
 	Serial.println(" ");
@@ -192,74 +197,54 @@ void loop()
 	Serial.println(" ");
 	Serial.println("**********************************************************************************************************************");
 
-
-
-
-	//delay(0);
-
 }
-
+/*
 //--(end main loop )---
 void calibratePID() {
-	RP_P_Corr = analogRead(RP_P_PIN);
-	RP_P_Corr = mapFloat(RP_P_Corr, 0, 1023, 0, 15);
+	pRollFactor = analogRead(RP_P_PIN);
+	pRollFactor = mapFloat(pRollFactor, 0, 4095, 0, 15);
 
-	RP_I_Corr = analogRead(RP_I_PIN);
-	RP_I_Corr = mapFloat(RP_I_Corr, 0, 1023, 0, 4);
+	iRollFactor = analogRead(RP_I_PIN);
+	iRollFactor = mapFloat(iRollFactor, 0, 4095, 0, 4);
 
-	RP_D_Corr = analogRead(RP_D_PIN);
-	RP_D_Corr = mapFloat(RP_D_Corr, 0, 1023, 0, 50);
+	dRollFactor = analogRead(RP_D_PIN);
+	dRollFactor = mapFloat(dRollFactor, 0, 4095, 0, 50);
 
-	Y_P_Corr = analogRead(Y_P_PIN);
-	Y_P_Corr = mapFloat(Y_P_Corr, 0, 1023, 0, 15);
+	pYawFactor = analogRead(Y_P_PIN);
+	pYawFactor = mapFloat(pYawFactor, 0, 4095, 0, 50);
 
-	Y_I_Corr = analogRead(Y_I_PIN);
-	Y_I_Corr = mapFloat(Y_I_Corr, 0, 1023, 0, 4);
+	iYawFactor = analogRead(Y_I_PIN);
+	iYawFactor = mapFloat(iYawFactor, 0, 4095, 0, 4);
 
-	Y_D_Corr = analogRead(Y_D_PIN);
-	Y_D_Corr = mapFloat(Y_D_Corr, 0, 1023, 0, 50);
+	dYawFactor = analogRead(Y_D_PIN);
+	dYawFactor = mapFloat(dYawFactor, 0, 4095, 0, 50);
 
-	pRollFactor = RP_P_Corr;
-	iRollFactor = RP_I_Corr;
-	dRollFactor = RP_D_Corr;
-	pYawFactor = Y_P_Corr;
-	iYawFactor = Y_I_Corr;
-	dYawFactor = Y_D_Corr;
-
-
-
-
-	//return RP_P_Corr;
-	//return RP_I_Corr;
-	//return RP_D_Corr;
 }
-
+*/
  //----------------------      Functions     --------------------------//
  //----------------------********************--------------------------//
 
-
-
 int setThrottle() {
 	int throttle = analogRead(throttlePin);
-	throttle = map(throttle, 0, 1023, 420, 2250);
+	throttle = map(throttle, 0, 4095, 420, 2250);
 	throttle = constrain(throttle, minThrottle, maxThrottle);
 	return throttle;
 }
 
-int setRoll() {
+float setRoll() {
 	int xInputValue = analogRead(rollPin);
 	if (xInputValue <= xInputZero) xInputValue = map(xInputValue, 0, xInputZero, minRoll, 0); 
-	else if (xInputValue >= xInputZero)	xInputValue = map(xInputValue, xInputZero, 1023, 0, maxRoll);
+	else if (xInputValue >= xInputZero)	xInputValue = map(xInputValue, xInputZero, 4095, 0, maxRoll);
 	if ((xInputValue > -10) && (xInputValue < 10)) xInputValue = 0;
 	else if (xInputValue > 0) xInputValue -= 10;
 	else if (xInputValue < 0) xInputValue += 10;
 	return xInputValue;
 }
 
-int setPitch() {
+float setPitch() {
 	int yInputValue = analogRead(pitchPin);
 	if (yInputValue <= yInputZero) yInputValue = map(yInputValue, 0, yInputZero, maxPitch, 0); 
-	else if (yInputValue >= yInputZero) yInputValue = map(yInputValue, yInputZero, 1023, 0, minPitch);
+	else if (yInputValue >= yInputZero) yInputValue = map(yInputValue, yInputZero, 4095, 0, minPitch);
 	if ((yInputValue > -10) && (yInputValue < 10)) yInputValue = 0;  //controller deadzone 
 	else if (yInputValue > 0) yInputValue -= 10; 
 	else if (yInputValue < 0)  yInputValue += 10; 
@@ -269,16 +254,12 @@ int setPitch() {
 float setYaw(){
 	yawPinValue = analogRead(yawPin);
 
-	if (yawPinValue <= yawZero) yawPinValue = mapFloat(yawPinValue, 0, yawZero, minYawAdj, 0);
-	else if (yawPinValue >= yawZero) yawPinValue = mapFloat(yawPinValue, yawZero, 1023, 0, maxYawAdj);
-	if ((yawPinValue < .5) && (yawPinValue > -.5)) {
+	if (yawPinValue <= yawZero) yawPinValue = mapFloat(yawPinValue, 0, yawZero, maxYawAdj, 0);
+	else if (yawPinValue >= yawZero) yawPinValue = mapFloat(yawPinValue, yawZero, 4095, 0, minYawAdj);
+	if ((yawPinValue < 5) && (yawPinValue > -5)) {
 		yawPinValue = 0;
 	}
-	yawPinValue = yawPinValue / yawGain;
-	yawValue += yawPinValue;
-	if (yawValue > 180) yawValue = -yawValue;
-	else if (yawValue < -180) yawValue = -yawValue;
-	return yawValue;
+	return yawPinValue;
 }
 
 float mapFloat(float x, float in_min, float in_max, float out_min, float out_max) {
